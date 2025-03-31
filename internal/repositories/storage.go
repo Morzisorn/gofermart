@@ -19,6 +19,7 @@ type Repository interface {
 	GetOrdersWithStatus(ctx context.Context, status string) (*[]models.Order, error)
 	OrderProcessed(ctx context.Context, login, number string, accrual float64) error
 	GetUpprocessedOrders(ctx context.Context) (*[]models.Order, error)
+	GetOrderByNumber(ctx context.Context, number string) (*models.Order, error)
 }
 
 type DBRepository struct {
@@ -63,4 +64,8 @@ func (r *DBRepository) OrderProcessed(ctx context.Context, login, number string,
 }
 func (r *DBRepository) GetUpprocessedOrders(ctx context.Context) (*[]models.Order, error) {
 	return r.orders.GetUpprocessedOrders(ctx)
+}
+
+func (r *DBRepository) GetOrderByNumber(ctx context.Context, number string) (*models.Order, error) {
+	return r.orders.GetOrderByNumber(ctx, number)
 }

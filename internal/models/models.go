@@ -4,14 +4,14 @@ import "time"
 
 type User struct {
 	Login     string   `json:"login"`
-	Password  [32]byte `json:-`
+	Password  [32]byte `json:"-"`
 	Current   float64  `json:"current"`
 	Withdrawn float64  `json:"withdrawn"`
 }
 
 type ParseUserRegister struct {
-	Login     string   `json:"login"`
-	Password  string `json:"password"`
+	Login    string `json:"login"`
+	Password string `json:"password"`
 }
 
 type Order struct {
@@ -21,7 +21,6 @@ type Order struct {
 	Status     string    `json:"status"`
 	Accrual    float64   `json:"accrual,omitempty"`
 }
-
 
 type UserBalance struct {
 	Current   float64 `json:"current"`
@@ -40,8 +39,6 @@ type LoyaltyOrder struct {
 	Status  string  `json:"status"`
 	Accrual float64 `json:"accrual"`
 }
-
-
 
 const (
 	OrderStatusNEW        string = "NEW"

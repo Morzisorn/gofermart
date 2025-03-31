@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/morzisorn/gofermart/internal/errs"
 	"github.com/morzisorn/gofermart/internal/models"
 	"github.com/morzisorn/gofermart/internal/services/orders"
 )
@@ -39,12 +40,12 @@ func (oc *OrderController) UploadOrder(c *gin.Context) {
 
 	err = oc.service.UploadOrder(context.Background(), login, string(number))
 	switch {
-	case errors.Is(err, orders.ErrIncorrectNumber):
+	case errors.Is(err, errs.ErrIncorrectNumber):
 		c.String(http.StatusUnprocessableEntity, err.Error())
 		return
-	case errors.Is(err, orders.ErrOrderAlreadyExist):
+	case errors.Is(err, errs.ErrOrderAlreadyExist):
 		c.String(http.StatusOK, err.Error())
-	case errors.Is(err, orders.ErrOrderBelongsAnotherUser):
+	case errors.Is(err, errs.ErrOrderBelongsAnotherUser):
 		c.String(http.StatusConflict, err.Error())
 	case err != nil:
 		c.String(http.StatusInternalServerError, err.Error())
@@ -64,7 +65,7 @@ func (oc *OrderController) GetUserOrders(c *gin.Context) {
 
 	ord, err := oc.service.GetUserOrders(context.Background(), login)
 	switch {
-	case errors.Is(err, orders.ErrNoData):
+	case errors.Is(err, errs.ErrNoData):
 		c.Status(http.StatusNoContent)
 		return
 	case err != nil:
@@ -85,7 +86,7 @@ func (oc *OrderController) GetUserWithdrawals(c *gin.Context) {
 
 	withdrawals, err := oc.service.GetUserWithdrawals(context.Background(), login)
 	switch {
-	case errors.Is(err, orders.ErrNoData):
+	case errors.Is(err, errs.ErrNoData):
 		c.Status(http.StatusNoContent)
 		return
 	case err != nil:
@@ -112,10 +113,10 @@ func (oc *OrderController) Withdraw(c *gin.Context) {
 
 	err := oc.service.Withdraw(context.Background(), login, &w)
 	switch {
-	case errors.Is(err, orders.ErrIncorrectNumber):
+	case errors.Is(err, errs.ErrIncorrectNumber):
 		c.String(http.StatusUnprocessableEntity, err.Error())
 		return
-	case errors.Is(err, orders.ErrInsufficientBalance):
+	case errors.Is(err, errs.ErrInsufficientBalance):
 		c.String(http.StatusPaymentRequired, err.Error())
 		return
 	case err != nil:

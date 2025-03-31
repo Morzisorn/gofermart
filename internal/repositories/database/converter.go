@@ -45,6 +45,16 @@ func dbToModelOrders(dbOrders *[]gen.Order) *[]models.Order {
 	return &orders
 }
 
+func dbToModelOrder(o *gen.Order) *models.Order {
+	return &models.Order{
+		Number:     o.Number,
+		UploadedAt: pgTimeToTime(o.UploadedAt),
+		UserLogin: o.UserLogin,
+		Status:     pgxTextToString(o.Status),
+		Accrual:    pgxFloat4ToFloat64(o.Accrual),
+	}
+}
+
 func dbToModelWithdrawals(dbOrders *[]gen.Withdrawal) *[]models.Withdrawal {
 	withdrawals := make([]models.Withdrawal, len(*dbOrders))
 	for i, o := range *dbOrders {

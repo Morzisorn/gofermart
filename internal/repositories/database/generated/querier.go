@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	GetOrderByNumber(ctx context.Context, number string) (Order, error)
 	GetOrdersWithStatus(ctx context.Context, status pgtype.Text) ([]Order, error)
 	GetUnprocessedOrders(ctx context.Context) ([]Order, error)
 	GetUser(ctx context.Context, login string) (User, error)
@@ -20,7 +21,7 @@ type Querier interface {
 	UpdateOrderAccrual(ctx context.Context, arg UpdateOrderAccrualParams) error
 	UpdateOrderStatus(ctx context.Context, arg UpdateOrderStatusParams) error
 	UpdateUserBalance(ctx context.Context, arg UpdateUserBalanceParams) error
-	UploadOrder(ctx context.Context, arg UploadOrderParams) (string, error)
+	UploadOrder(ctx context.Context, arg UploadOrderParams) error
 	UploadWithdrawal(ctx context.Context, arg UploadWithdrawalParams) error
 }
 

@@ -7,10 +7,9 @@ SELECT login, password, current, withdrawn
 FROM users
 WHERE login = $1;
 
--- name: UploadOrder :one
+-- name: UploadOrder :exec
 INSERT INTO orders (number, user_login)
-VALUES ($1, $2)
-RETURNING user_login;
+VALUES ($1, $2);
 
 -- name: UploadWithdrawal :exec
 INSERT INTO withdrawals (number, user_login, sum)
@@ -52,3 +51,8 @@ WHERE status = $1;
 SELECT number, uploaded_at, user_login, status, accrual
 FROM orders
 WHERE status in ('NEW', 'PROCESSING');
+
+-- name: GetOrderByNumber :one
+SELECT number, uploaded_at, user_login, status, accrual
+FROM orders
+WHERE number = $1;

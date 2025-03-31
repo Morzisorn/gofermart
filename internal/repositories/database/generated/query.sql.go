@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getOrderByNumber = `-- name: GetOrderByNumber :one
+SELECT number, uploaded_at, user_login, status, accrual
+FROM orders
+WHERE number = $1
+`
+
+func (q *Queries) GetOrderByNumber(ctx context.Context, number string) (Order, error) {
+	row := q.db.QueryRow(ctx, getOrderByNumber, number)
+	var i Order
+	err := row.Scan(
+		&i.Number,
+		&i.UploadedAt,
+		&i.UserLogin,
+		&i.Status,
+		&i.Accrual,
+	)
+	return i, err
+}
+
 const getOrdersWithStatus = `-- name: GetOrdersWithStatus :many
 SELECT number, uploaded_at, user_login, status, accrual
 FROM orders
@@ -222,10 +241,9 @@ func (q *Queries) UpdateUserBalance(ctx context.Context, arg UpdateUserBalancePa
 	return err
 }
 
-const uploadOrder = `-- name: UploadOrder :one
+const uploadOrder = `-- name: UploadOrder :exec
 INSERT INTO orders (number, user_login)
 VALUES ($1, $2)
-RETURNING user_login
 `
 
 type UploadOrderParams struct {
@@ -233,11 +251,9 @@ type UploadOrderParams struct {
 	UserLogin string `json:"user_login"`
 }
 
-func (q *Queries) UploadOrder(ctx context.Context, arg UploadOrderParams) (string, error) {
-	row := q.db.QueryRow(ctx, uploadOrder, arg.Number, arg.UserLogin)
-	var user_login string
-	err := row.Scan(&user_login)
-	return user_login, err
+func (q *Queries) UploadOrder(ctx context.Context, arg UploadOrderParams) error {
+	_, err := q.db.Exec(ctx, uploadOrder, arg.Number, arg.UserLogin)
+	return err
 }
 
 const uploadWithdrawal = `-- name: UploadWithdrawal :exec

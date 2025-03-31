@@ -4,20 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
+	"github.com/morzisorn/gofermart/internal/errs"
 	"github.com/morzisorn/gofermart/internal/logger"
 	"github.com/morzisorn/gofermart/internal/models"
 	"github.com/morzisorn/gofermart/internal/repositories"
 	"github.com/morzisorn/gofermart/internal/services/users"
 	"go.uber.org/zap"
-)
-
-var (
-	ErrIncorrectNumber         = errors.New("number validation failed")
-	ErrOrderAlreadyExist       = errors.New("order number is already exist")
-	ErrOrderBelongsAnotherUser = errors.New("belongs to another user")
-	ErrNoData                  = errors.New("no data")
-	ErrInsufficientBalance     = errors.New("insufficient balance")
 )
 
 type OrderService struct {
@@ -34,21 +28,13 @@ func NewOrderService(repo repositories.Repository, user *users.UserService) *Ord
 
 func (os *OrderService) UploadOrder(ctx context.Context, login, number string) error {
 	if !isNumberValid(number) {
-		return ErrIncorrectNumber
+		return errs.ErrIncorrectNumber
 	}
 
-	dbLogin, err := os.repo.UploadOrder(ctx, login, number)
-	switch {
-	case errors.Is(err, ErrOrderAlreadyExist):
-		if login == dbLogin {
-			return ErrOrderAlreadyExist
-		}
-		return ErrOrderBelongsAnotherUser
-	case err != nil:
-		return err
+	_, err := os.repo.UploadOrder(ctx, login, number)
+	if err != nil {
+		return fmt.Errorf("failed to upload order: %w", err)
 	}
-
-	//go processOrder(ctx, number)
 
 	return nil
 }
@@ -57,7 +43,7 @@ func (os *OrderService) GetUserOrders(ctx context.Context, login string) (*[]mod
 	orders, err := os.repo.GetUserOrders(ctx, login)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		return nil, ErrNoData
+		return nil, errs.ErrNoData
 	case err != nil:
 		return nil, err
 	}
@@ -72,7 +58,7 @@ func (os *OrderService) GetUserWithdrawals(ctx context.Context, login string) (*
 	withdrawals, err := os.repo.GetUserWithdrawals(ctx, login)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		return nil, ErrNoData
+		return nil, errs.ErrNoData
 	case err != nil:
 		return nil, err
 	}
@@ -86,11 +72,11 @@ func (os *OrderService) Withdraw(ctx context.Context, login string, w *models.Wi
 	}
 
 	if balance.Current < w.Sum {
-		return ErrInsufficientBalance
+		return errs.ErrInsufficientBalance
 	}
 
 	if !isNumberValid(w.Number) {
-		return ErrIncorrectNumber
+		return errs.ErrIncorrectNumber
 	}
 
 	return os.repo.Withdraw(ctx, login, w.Number, w.Sum)

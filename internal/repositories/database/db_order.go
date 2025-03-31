@@ -6,8 +6,10 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/morzisorn/gofermart/internal/errs"
 	"github.com/morzisorn/gofermart/internal/logger"
 	"github.com/morzisorn/gofermart/internal/models"
 	gen "github.com/morzisorn/gofermart/internal/repositories/database/generated"
@@ -22,6 +24,7 @@ type OrderRepository interface {
 	GetOrdersWithStatus(ctx context.Context, status string) (*[]models.Order, error)
 	OrderProcessed(ctx context.Context, login, number string, accrual float64) error
 	GetUpprocessedOrders(ctx context.Context) (*[]models.Order, error)
+	GetOrderByNumber(ctx context.Context, number string) (*models.Order, error)
 }
 
 type orderRepository struct {
@@ -37,10 +40,25 @@ func NewOrderRepository(q *gen.Queries, db *pgxpool.Pool) OrderRepository {
 }
 
 func (r *orderRepository) UploadOrder(ctx context.Context, login, number string) (string, error) {
-	return r.q.UploadOrder(ctx, gen.UploadOrderParams{
+	err := r.q.UploadOrder(ctx, gen.UploadOrderParams{
 		UserLogin: login,
 		Number:    number,
 	})
+	if err != nil {
+		if pgErr, ok := err.(*pgconn.PgError); ok && pgErr.Code == "23505" {
+			order, err := r.GetOrderByNumber(ctx, number)
+			if err != nil {
+				return "", err
+			}
+
+			if login == order.UserLogin {
+				return "", errs.ErrOrderAlreadyExist
+			}
+			return order.UserLogin, errs.ErrOrderBelongsAnotherUser
+		}
+		return "", err
+	}
+	return login, nil
 }
 
 func (r *orderRepository) Withdraw(ctx context.Context, login, number string, sum float64) error {
@@ -196,4 +214,13 @@ func (r *orderRepository) OrderProcessed(ctx context.Context, login, number stri
 		return err
 	}
 	return nil
+}
+
+func (r *orderRepository) GetOrderByNumber(ctx context.Context, number string) (*models.Order, error) {
+	order, err := r.q.GetOrderByNumber(ctx, number)
+	if err != nil {
+		return nil, err
+	}
+	
+	return dbToModelOrder(&order), nil
 }
