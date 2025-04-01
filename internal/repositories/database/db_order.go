@@ -79,7 +79,7 @@ func (r *orderRepository) Withdraw(ctx context.Context, login, number string, su
 	if err != nil {
 		errr := tx.Rollback(ctx)
 		if errr != nil {
-			logger.Log.Error("Failed to rollback withdrawal transaction")
+			logger.Log.Error("failed to rollback withdrawal transaction")
 		}
 		if strings.Contains(err.Error(), "duplicate key value violates unique constraint") {
 			return fmt.Errorf("order number is already exist")
@@ -100,7 +100,7 @@ func (r *orderRepository) Withdraw(ctx context.Context, login, number string, su
 	if err != nil {
 		errr := tx.Rollback(ctx)
 		if errr != nil {
-			logger.Log.Error("Failed to rollback withdrawal transaction")
+			logger.Log.Error("failed to rollback withdrawal transaction")
 		}
 
 		return err
@@ -173,9 +173,9 @@ func (r *orderRepository) OrderProcessed(ctx context.Context, login, number stri
 	if err != nil {
 		errr := tx.Rollback(ctx)
 		if errr != nil {
-			logger.Log.Error("Failed to rollback withdrawal transaction")
+			logger.Log.Error("failed to rollback withdrawal transaction")
 		}
-		return fmt.Errorf("Failed to update accrual. Order number: %s", number)
+		return fmt.Errorf("failed to update accrual. Order number: %s", number)
 	}
 
 	err = qtx.UpdateOrderStatus(ctx, gen.UpdateOrderStatusParams{
@@ -186,28 +186,30 @@ func (r *orderRepository) OrderProcessed(ctx context.Context, login, number stri
 	if err != nil {
 		errr := tx.Rollback(ctx)
 		if errr != nil {
-			logger.Log.Error("Failed to rollback withdrawal transaction")
+			logger.Log.Error("failed to rollback withdrawal transaction")
 		}
-		return fmt.Errorf("Failed to update order status to PROCESSED. Order number: %s", number)
+		return fmt.Errorf("failed to update order status to PROCESSED. Order number: %s", number)
 	}
 
-	err = qtx.UpdateUserBalance(ctx, gen.UpdateUserBalanceParams{
-		Login: login,
-		Current: pgtype.Float4{
-			Float32: float32(accrual),
-		},
-		Withdrawn: pgtype.Float4{
-			Float32: float32(0),
-		},
-	})
+	if accrual > 0 {
+		err = qtx.UpdateUserBalance(ctx, gen.UpdateUserBalanceParams{
+			Login: login,
+			Current: pgtype.Float4{
+				Float32: float32(accrual),
+			},
+			Withdrawn: pgtype.Float4{
+				Float32: float32(0),
+			},
+		})
+	}
 
 	if err != nil {
 		errr := tx.Rollback(ctx)
 		if errr != nil {
-			logger.Log.Panic("Failed to rollback withdrawal transaction")
+			logger.Log.Panic("failed to rollback withdrawal transaction")
 		}
 
-		return fmt.Errorf("Failed to update user balance. User login: %s", login)
+		return fmt.Errorf("failed to update user balance. User login: %s", login)
 	}
 
 	if err = tx.Commit(ctx); err != nil {
@@ -221,6 +223,6 @@ func (r *orderRepository) GetOrderByNumber(ctx context.Context, number string) (
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return dbToModelOrder(&order), nil
 }

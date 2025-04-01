@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -37,11 +40,9 @@ func main() {
 
 	mux := createServer(userController, orderController)
 
-	/*
-		if err := runAccrualServer(cnfg); err != nil {
-			logger.Log.Panic("Error running accrual server", zap.Error(err))
-		}
-	*/
+	if err := runAccrualServer(); err != nil {
+		logger.Log.Panic("Error running accrual server", zap.Error(err))
+	}
 
 	go runProcessing(processingService, cnfg)
 
@@ -50,8 +51,17 @@ func main() {
 	}
 }
 
-func runAccrualServer(cnfg *config.Config) error {
-	cmd := exec.Command(cnfg.AccrualSystemAddress)
+func runAccrualServer() error {
+	root, err := config.GetProjectRoot()
+	if err != nil {
+		return fmt.Errorf("get project root error: %w", err)
+	}
+
+	filename := fmt.Sprintf("accrual_%s_%s", runtime.GOOS, runtime.GOARCH)
+
+	filepath := filepath.Join(root, "cmd", "accrual", filename)
+
+	cmd := exec.Command(filepath)
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
