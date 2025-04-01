@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,6 +25,9 @@ import (
 var cnfg *config.Config
 
 func main() {
+	if err := logger.Init(); err != nil {
+		panic(err)
+	}
 	cnfg = config.GetConfig()
 
 	repo := repositories.NewRepository(cnfg)
@@ -41,7 +45,7 @@ func main() {
 	mux := createServer(userController, orderController)
 
 	if err := runAccrualServer(); err != nil {
-		logger.Log.Panic("Error running accrual server", zap.Error(err))
+		logger.Log.Error("Error running accrual server", zap.Error(err))
 	}
 
 	go runProcessing(processingService, cnfg)
@@ -58,15 +62,38 @@ func runAccrualServer() error {
 	}
 
 	filename := fmt.Sprintf("accrual_%s_%s", runtime.GOOS, runtime.GOARCH)
-
 	filepath := filepath.Join(root, "cmd", "accrual", filename)
 
-	cmd := exec.Command(filepath)
+	cmd := exec.Command(filepath, "-a=:8080")
 
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	return cmd.Start()
+	logger.Log.Info("Accrual binary path", zap.String("path", filepath))
+
+	logger.Log.Info("Running accrual server")
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start accrual server: %w", err)
+	}
+
+	go func() {
+		err := cmd.Wait()
+		if err != nil {
+			logger.Log.Error("accrual process exited with error", zap.Error(err))
+		}
+	}()
+
+	const maxAttempts = 3
+	for i := 0; i < maxAttempts; i++ {
+		resp, err := http.Get("http://localhost:8080/api/orders/12345678903")
+		if err == nil && resp.StatusCode < 300 {
+			logger.Log.Info("Accrual server is up and running")
+			return nil
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+
+	return fmt.Errorf("accrual server did not start in time")
 }
 
 func createServer(
@@ -93,12 +120,9 @@ func createServer(
 }
 
 func runServer(mux *gin.Engine) error {
-	if err := logger.Init(); err != nil {
-		return err
-	}
 	logger.Log.Info("Starting server on ", zap.String("address", cnfg.RunAddress))
 
-	return mux.Run(cnfg.RunAddress)
+	return mux.Run("localhost:8081") 
 }
 
 func runProcessing(ps *processing.ProcessingService, cnfg *config.Config) {
