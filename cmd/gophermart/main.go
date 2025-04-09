@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -106,22 +105,23 @@ func runAccrualServer() error {
 		return fmt.Errorf("failed to start accrual server: %w", err)
 	}
 
-	go func() {
-		err := accrualCmd.Wait()
-		if err != nil {
-			logger.Log.Error("accrual process exited with error", zap.Error(err))
-		}
-	}()
+	// go func() {
+	// 	err := accrualCmd.Wait()
+	// 	if err != nil {
+	// 		logger.Log.Error("accrual process exited with error", zap.Error(err))
+	// 		accrualCmd.Process.Kill()
+	// 	}
+	// }()
 
-	const maxAttempts = 3
-	for i := 0; i < maxAttempts; i++ {
-		resp, err := http.Get(fmt.Sprintf("http://%s/api/orders/12345678903", cnfg.AccrualSystemAddress))
-		if err == nil && resp.StatusCode < 300 {
-			logger.Log.Info("Accrual server is up and running")
-			return nil
-		}
-		time.Sleep(500 * time.Millisecond)
-	}
+	// const maxAttempts = 3
+	// for i := 0; i < maxAttempts; i++ {
+	// 	resp, err := http.Get(fmt.Sprintf("http://%s/api/orders/12345678903", cnfg.AccrualSystemAddress))
+	// 	if err == nil && resp.StatusCode < 300 {
+	// 		logger.Log.Info("Accrual server is up and running")
+	// 		return nil
+	// 	}
+	// 	time.Sleep(500 * time.Millisecond)
+	// }
 
 	return fmt.Errorf("accrual server did not start in time")
 }
@@ -152,7 +152,7 @@ func createServer(
 func runServer(mux *gin.Engine) error {
 	logger.Log.Info("Starting server on ", zap.String("address", cnfg.RunAddress))
 
-	return mux.Run(cnfg.RunAddress) 
+	return mux.Run(cnfg.RunAddress)
 }
 
 func runProcessing(ps *processing.ProcessingService, cnfg *config.Config) {

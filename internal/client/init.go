@@ -14,8 +14,8 @@ type LoyaltyClient interface {
 
 func NewClient(cnfg *config.Config) LoyaltyClient {
 	return &HTTPClient{
-		BaseURL: "localhost:8080",
+		BaseURL: cnfg.AccrualSystemAddress,
 		Client: resty.New().
-			SetBaseURL("localhost:8080"),
+			SetBaseURL(cnfg.AccrualSystemAddress),
 	}
 }
