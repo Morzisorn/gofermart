@@ -6,8 +6,10 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
+	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -24,11 +26,32 @@ import (
 
 var cnfg *config.Config
 
+var accrualCmd *exec.Cmd
+
 func main() {
 	if err := logger.Init(); err != nil {
 		panic(err)
 	}
 	cnfg = config.GetConfig()
+
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	go func() {
+		<-c
+		logger.Log.Info("Shutting down...")
+
+		if accrualCmd != nil && accrualCmd.Process != nil {
+			err := accrualCmd.Process.Kill()
+			if err != nil {
+				logger.Log.Error("Failed to kill accrual process", zap.Error(err))
+			} else {
+				logger.Log.Info("Accrual process killed")
+			}
+		}
+
+		os.Exit(0)
+	}()
 
 	repo := repositories.NewRepository(cnfg)
 
@@ -51,7 +74,14 @@ func main() {
 	go runProcessing(processingService, cnfg)
 
 	if err := runServer(mux); err != nil {
+		err := accrualCmd.Process.Kill()
+		if err != nil {
+			logger.Log.Error("Failed to kill accrual process", zap.Error(err))
+		} else {
+			logger.Log.Info("Accrual process killed")
+		}
 		logger.Log.Panic("Error running server", zap.Error(err))
+
 	}
 }
 
@@ -62,22 +92,22 @@ func runAccrualServer() error {
 	}
 
 	filename := fmt.Sprintf("accrual_%s_%s", runtime.GOOS, runtime.GOARCH)
-	filepath := filepath.Join(root, "cmd", "accrual", filename)
+	path := filepath.Join(root, "cmd", "accrual", filename)
 
-	cmd := exec.Command(filepath, "-a=:8080")
+	accrualCmd = exec.Command(path, "-a", cnfg.AccrualSystemAddress)
 
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	accrualCmd.Stdout = os.Stdout
+	accrualCmd.Stderr = os.Stderr
 
-	logger.Log.Info("Accrual binary path", zap.String("path", filepath))
+	logger.Log.Info("Accrual binary path", zap.String("path", path))
 
 	logger.Log.Info("Running accrual server")
-	if err := cmd.Start(); err != nil {
+	if err := accrualCmd.Start(); err != nil {
 		return fmt.Errorf("failed to start accrual server: %w", err)
 	}
 
 	go func() {
-		err := cmd.Wait()
+		err := accrualCmd.Wait()
 		if err != nil {
 			logger.Log.Error("accrual process exited with error", zap.Error(err))
 		}
@@ -85,7 +115,7 @@ func runAccrualServer() error {
 
 	const maxAttempts = 3
 	for i := 0; i < maxAttempts; i++ {
-		resp, err := http.Get("http://localhost:8080/api/orders/12345678903")
+		resp, err := http.Get(fmt.Sprintf("http://%s/api/orders/12345678903", cnfg.AccrualSystemAddress))
 		if err == nil && resp.StatusCode < 300 {
 			logger.Log.Info("Accrual server is up and running")
 			return nil
@@ -122,7 +152,7 @@ func createServer(
 func runServer(mux *gin.Engine) error {
 	logger.Log.Info("Starting server on ", zap.String("address", cnfg.RunAddress))
 
-	return mux.Run("localhost:8081") 
+	return mux.Run(cnfg.RunAddress) 
 }
 
 func runProcessing(ps *processing.ProcessingService, cnfg *config.Config) {
