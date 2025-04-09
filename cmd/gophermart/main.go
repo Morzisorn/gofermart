@@ -74,14 +74,13 @@ func main() {
 	go runProcessing(processingService, cnfg)
 
 	if err := runServer(mux); err != nil {
+		logger.Log.Error("Error running server", zap.Error(err))
 		err := accrualCmd.Process.Kill()
 		if err != nil {
 			logger.Log.Error("Failed to kill accrual process", zap.Error(err))
 		} else {
 			logger.Log.Info("Accrual process killed")
 		}
-		logger.Log.Panic("Error running server", zap.Error(err))
-
 	}
 }
 
@@ -95,6 +94,7 @@ func runAccrualServer() error {
 	path := filepath.Join(root, "cmd", "accrual", filename)
 
 	accrualCmd = exec.Command(path, "-a", cnfg.AccrualSystemAddress)
+	accrualCmd.Env = []string{}
 
 	accrualCmd.Stdout = os.Stdout
 	accrualCmd.Stderr = os.Stderr
