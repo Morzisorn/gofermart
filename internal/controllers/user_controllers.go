@@ -61,7 +61,7 @@ func (uc *UserController) Login(c *gin.Context) {
 		return
 	}
 
-	var user  models.ParseUserRegister
+	var user models.ParseUserRegister
 	if err := c.BindJSON(&user); err != nil {
 		c.String(http.StatusBadRequest, err.Error())
 		return
@@ -87,17 +87,17 @@ func (uc *UserController) GetBalance(c *gin.Context) {
 		return
 	}
 
-	var user *models.User
-	if err := c.BindJSON(user); err != nil {
-		c.String(http.StatusBadRequest, err.Error())
-		return
+	login := c.GetString("login")
+
+	user := models.User{
+		Login: login,
 	}
 
-	balance, err := uc.service.GetBalance(context.Background(), user)
+	balance, err := uc.service.GetBalance(context.Background(), &user)
 	if err != nil {
 		c.String(http.StatusInternalServerError, err.Error())
 		return
 	}
-	
+
 	c.JSON(http.StatusOK, balance)
 }
