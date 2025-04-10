@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS users (
     login VARCHAR(50) NOT NULL PRIMARY KEY,
     password BYTEA NOT NULL,
-    current REAL,
-    withdrawn REAL 
+    current REAL DEFAULT 0,
+    withdrawn REAL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS orders (

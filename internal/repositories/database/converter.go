@@ -19,7 +19,7 @@ func pgxFloat4ToFloat64(i pgtype.Float4) float64 {
 func pgTimeToTime(pgTime pgtype.Timestamp) time.Time {
 	if pgTime.Valid {
 		return pgTime.Time
-	}	
+	}
 	logger.Log.Panic("Invalid time")
 	return time.Time{}
 }
@@ -40,6 +40,7 @@ func dbToModelOrders(dbOrders *[]gen.Order) *[]models.Order {
 			UploadedAt: pgTimeToTime(o.UploadedAt),
 			Status:     pgxTextToString(o.Status),
 			Accrual:    pgxFloat4ToFloat64(o.Accrual),
+			UserLogin:  o.UserLogin,
 		}
 	}
 	return &orders
@@ -49,7 +50,7 @@ func dbToModelOrder(o *gen.Order) *models.Order {
 	return &models.Order{
 		Number:     o.Number,
 		UploadedAt: pgTimeToTime(o.UploadedAt),
-		UserLogin: o.UserLogin,
+		UserLogin:  o.UserLogin,
 		Status:     pgxTextToString(o.Status),
 		Accrual:    pgxFloat4ToFloat64(o.Accrual),
 	}
@@ -66,4 +67,3 @@ func dbToModelWithdrawals(dbOrders *[]gen.Withdrawal) *[]models.Withdrawal {
 	}
 	return &withdrawals
 }
-
