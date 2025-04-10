@@ -156,14 +156,13 @@ func runServer(mux *gin.Engine) error {
 }
 
 func runProcessing(ps *processing.ProcessingService, cnfg *config.Config) {
-	lastUpdate := time.Now()
-	for {
-		if time.Since(lastUpdate).Seconds() > float64(cnfg.LoyaltyUpdateInterval) {
-			lastUpdate = time.Now()
-			err := ps.ProcessOrders(context.Background())
-			if err != nil {
-				logger.Log.Error("Processing error: ", zap.Error(err))
-			}
+	ticker := time.NewTicker(time.Duration(cnfg.LoyaltyUpdateInterval) * time.Second)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		err := ps.ProcessOrders(context.Background())
+		if err != nil {
+			logger.Log.Error("Processing error: ", zap.Error(err))
 		}
 	}
 }

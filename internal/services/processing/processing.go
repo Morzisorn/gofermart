@@ -28,17 +28,22 @@ func (ps *ProcessingService) ProcessOrders(ctx context.Context) error {
 	chIn := ps.ordersProducer(ctx)
 
 	var wg sync.WaitGroup
+	var loyaltyWg sync.WaitGroup
 
 	rateLimit := config.GetConfig().RateLimit
 
 	chLoyaltyUpdates := make(chan models.Order, 10)
 
-	ps.runLoyaltyWorkers(ctx, chIn, chLoyaltyUpdates, &wg, rateLimit)
+	ps.runLoyaltyWorkers(ctx, chIn, chLoyaltyUpdates, &loyaltyWg, rateLimit)
+
+	go func() {
+		loyaltyWg.Wait()
+		close(chLoyaltyUpdates)
+	}()
 
 	ps.runUpdateWorker(ctx, chLoyaltyUpdates, &wg, rateLimit)
 
 	wg.Wait()
-	close(chLoyaltyUpdates)
 
 	return nil
 }

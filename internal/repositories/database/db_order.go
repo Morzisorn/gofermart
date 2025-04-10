@@ -74,6 +74,7 @@ func (r *orderRepository) Withdraw(ctx context.Context, login, number string, su
 		UserLogin: login,
 		Sum: pgtype.Float4{
 			Float32: float32(sum),
+			Valid: true,
 		},
 	})
 	if err != nil {
@@ -91,9 +92,11 @@ func (r *orderRepository) Withdraw(ctx context.Context, login, number string, su
 		Login: login,
 		Current: pgtype.Float4{
 			Float32: float32(-sum),
+			Valid: true,
 		},
 		Withdrawn: pgtype.Float4{
 			Float32: float32(sum),
+			Valid: true,
 		},
 	})
 
@@ -151,7 +154,10 @@ func (r *orderRepository) GetUserWithdrawals(ctx context.Context, login string) 
 func (r *orderRepository) UpdateOrderStatus(ctx context.Context, number, status string) error {
 	return r.q.UpdateOrderStatus(ctx, gen.UpdateOrderStatusParams{
 		Number: number,
-		Status: pgtype.Text{String: status},
+		Status: pgtype.Text{
+			String: status,
+			Valid: true,
+		},
 	})
 }
 
@@ -167,6 +173,7 @@ func (r *orderRepository) OrderProcessed(ctx context.Context, login, number stri
 		Number: number,
 		Accrual: pgtype.Float4{
 			Float32: float32(accrual),
+			Valid: true,
 		},
 	})
 
@@ -180,7 +187,10 @@ func (r *orderRepository) OrderProcessed(ctx context.Context, login, number stri
 
 	err = qtx.UpdateOrderStatus(ctx, gen.UpdateOrderStatusParams{
 		Number: number,
-		Status: pgtype.Text{String: models.OrderStatusPROCESSED},
+		Status: pgtype.Text{
+			String: models.OrderStatusPROCESSED,
+			Valid: true,
+		},
 	})
 
 	if err != nil {
@@ -196,9 +206,11 @@ func (r *orderRepository) OrderProcessed(ctx context.Context, login, number stri
 			Login: login,
 			Current: pgtype.Float4{
 				Float32: float32(accrual),
+				Valid: true,
 			},
 			Withdrawn: pgtype.Float4{
 				Float32: float32(0),
+				Valid: true,
 			},
 		})
 	}
