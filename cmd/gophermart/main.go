@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"runtime"
-	"syscall"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -29,8 +27,8 @@ func main() {
 	}
 	cnfg := config.GetConfig()
 
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	//c := make(chan os.Signal, 1)
+	//signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
 	var accrualCmd *exec.Cmd
 
@@ -49,7 +47,8 @@ func main() {
 	mux := createServer(userController, orderController)
 
 	accrualCmd, err := createAccrualServer(cnfg)
-	//defer killProcess(accrualCmd)
+
+	defer killProcess(accrualCmd)
 
 	if err != nil {
 		logger.Log.Fatal("Failed to create accrual server")
@@ -137,7 +136,6 @@ func runProcessing(ctx context.Context, ps *processing.ProcessingService, cnfg *
 		}
 	}
 }
-
 
 func killProcess(p *exec.Cmd) {
 	if p != nil && p.Process != nil {
