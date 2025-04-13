@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/morzisorn/gofermart/internal/logger"
@@ -32,7 +33,10 @@ func (c *Config) parseEnv() error {
 
 	accrual, err := getEnvString("ACCRUAL_SYSTEM_ADDRESS")
 	if err == nil {
-		c.AccrualSystemAddress = accrual
+		if strings.Contains(accrual, "http://") {
+			spl := strings.Split(accrual, "//")
+			c.AccrualSystemAddress = spl[1]
+		}
 	}
 
 	key, err := getEnvString("SECRET_KEY")
