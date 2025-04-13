@@ -49,7 +49,7 @@ func main() {
 	mux := createServer(userController, orderController)
 
 	accrualCmd, err := createAccrualServer(cnfg)
-	defer killProcess(accrualCmd)
+	//defer killProcess(accrualCmd)
 
 	if err != nil {
 		logger.Log.Fatal("Failed to create accrual server")

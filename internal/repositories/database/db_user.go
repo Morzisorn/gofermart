@@ -39,9 +39,15 @@ func (r *userRepository) GetUser(ctx context.Context, login string) (*models.Use
 		return nil, fmt.Errorf("get db user error: %w", err)
 	}
 
+	withdrawn, err := pgxFloat4ToFloat64(u.Withdrawn)
+	if err != nil {
+		return nil, fmt.Errorf("get db user error: %w", err)
+	}
+
 	return &models.User{
-		Login:    u.Login,
-		Password: [32]byte(u.Password),
-		Current:  current,
+		Login:     u.Login,
+		Password:  [32]byte(u.Password),
+		Current:   current,
+		Withdrawn: withdrawn,
 	}, nil
 }
