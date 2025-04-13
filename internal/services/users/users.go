@@ -23,10 +23,10 @@ func NewUserService(repo repositories.Repository) *UserService {
 func (us *UserService) GetUser(ctx context.Context, user *models.User) (*models.User, error) {
 	var err error
 	user, err = us.repo.GetUser(ctx, user.Login)
-	switch err {
-	case pgx.ErrNoRows:
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
 		return nil, fmt.Errorf("get user error: %w", errs.ErrUserNotFound)
-	case nil:
+	case err == nil:
 		return user, nil
 	}
 	return nil, fmt.Errorf("get user error: %w", err)
