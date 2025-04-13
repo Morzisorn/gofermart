@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -14,22 +13,16 @@ import (
 	gen "github.com/morzisorn/gofermart/internal/repositories/database/generated"
 )
 
-var (
-	once sync.Once
-)
-
 func NewRepository(cfg *config.Config) Repository {
 	db, err := pgxpool.New(context.Background(), cfg.DatabaseURI)
 	if err != nil {
 		logger.Log.Panic(err.Error())
 	}
 
-	once.Do(func() {
-		err = createTables(db)
-		if err != nil {
-			logger.Log.Panic(err.Error())
-		}
-	})
+	err = createTables(db)
+	if err != nil {
+		logger.Log.Panic(err.Error())
+	}
 
 	q := gen.New(db)
 

@@ -2,7 +2,6 @@ package controllers
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 
@@ -20,16 +19,6 @@ func NewUserController(s *users.UserService) *UserController {
 }
 
 func (uc *UserController) RegisterUser(c *gin.Context) {
-	if c.Request.Method != http.MethodPost {
-		c.String(http.StatusBadRequest, "Invalid request method")
-		return
-	}
-
-	if c.Request.Header.Get("Content-Type") != "application/json" {
-		c.String(http.StatusBadRequest, "Invalid content type")
-		return
-	}
-
 	var user models.ParseUserRegister
 	if err := c.BindJSON(&user); err != nil {
 		c.String(http.StatusBadRequest, err.Error())
@@ -37,13 +26,8 @@ func (uc *UserController) RegisterUser(c *gin.Context) {
 	}
 
 	token, err := uc.service.RegisterUser(context.Background(), &user)
-	switch {
-	case errors.Is(err, users.ErrUserAlreadyRegistered):
-		c.String(http.StatusConflict, users.ErrUserAlreadyRegistered.Error())
-		return
-	case err != nil:
-		c.String(http.StatusInternalServerError, "internal server error")
-		return
+	if err != nil {
+		c.String(statusFromError(err), err.Error())
 	}
 
 	c.Writer.Header().Add("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -51,16 +35,6 @@ func (uc *UserController) RegisterUser(c *gin.Context) {
 }
 
 func (uc *UserController) Login(c *gin.Context) {
-	if c.Request.Method != http.MethodPost {
-		c.String(http.StatusBadRequest, "Invalid request method")
-		return
-	}
-
-	if c.Request.Header.Get("Content-Type") != "application/json" {
-		c.String(http.StatusBadRequest, "Invalid content type")
-		return
-	}
-
 	var user models.ParseUserRegister
 	if err := c.BindJSON(&user); err != nil {
 		c.String(http.StatusBadRequest, err.Error())
@@ -68,13 +42,8 @@ func (uc *UserController) Login(c *gin.Context) {
 	}
 
 	token, err := uc.service.LoginUser(context.Background(), &user)
-	switch {
-	case errors.Is(err, users.ErrIncorrectCredentials):
-		c.String(http.StatusUnauthorized, users.ErrIncorrectCredentials.Error())
-		return
-	case err != nil:
-		c.String(http.StatusInternalServerError, users.ErrInternalServerError.Error())
-		return
+	if err != nil {
+		c.String(statusFromError(err), err.Error())
 	}
 
 	c.Writer.Header().Add("Authorization", fmt.Sprintf("Bearer %s", token))
@@ -82,21 +51,13 @@ func (uc *UserController) Login(c *gin.Context) {
 }
 
 func (uc *UserController) GetBalance(c *gin.Context) {
-	if c.Request.Method != http.MethodGet {
-		c.String(http.StatusBadRequest, "Invalid request method")
-		return
-	}
-
 	login := c.GetString("login")
 
-	user := models.User{
+	balance, err := uc.service.GetBalance(context.Background(), &models.User{
 		Login: login,
-	}
-
-	balance, err := uc.service.GetBalance(context.Background(), &user)
+	})
 	if err != nil {
-		c.String(http.StatusInternalServerError, err.Error())
-		return
+		c.String(statusFromError(err), err.Error())
 	}
 
 	c.JSON(http.StatusOK, balance)

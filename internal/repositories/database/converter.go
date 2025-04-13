@@ -1,69 +1,95 @@
 package database
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/morzisorn/gofermart/internal/logger"
 	"github.com/morzisorn/gofermart/internal/models"
 	gen "github.com/morzisorn/gofermart/internal/repositories/database/generated"
 )
 
-func pgxFloat4ToFloat64(i pgtype.Float4) float64 {
+func pgxFloat4ToFloat64(i pgtype.Float4) (float64, error) {
 	if i.Valid {
-		return float64(i.Float32)
+		return float64(i.Float32), nil
 	}
-	return 0
+
+	return 0, fmt.Errorf("invalid float")
 }
 
-func pgTimeToTime(pgTime pgtype.Timestamp) time.Time {
+func pgTimeToTime(pgTime pgtype.Timestamp) (time.Time, error) {
 	if pgTime.Valid {
-		return pgTime.Time
+		return pgTime.Time, nil
 	}
-	logger.Log.Panic("Invalid time")
-	return time.Time{}
+
+	return time.Time{}, fmt.Errorf("invalid time")
 }
 
-func pgxTextToString(s pgtype.Text) string {
+func pgxTextToString(s pgtype.Text) (string, error) {
 	if s.Valid {
-		return s.String
+		return s.String, nil
 	}
-	logger.Log.Panic("Invalid status")
-	return ""
+
+	return "", fmt.Errorf("invalid string")
 }
 
-func dbToModelOrders(dbOrders *[]gen.Order) *[]models.Order {
+func dbToModelOrders(dbOrders *[]gen.Order) (*[]models.Order, error) {
 	orders := make([]models.Order, len(*dbOrders))
+
 	for i, o := range *dbOrders {
-		orders[i] = models.Order{
-			Number:     o.Number,
-			UploadedAt: pgTimeToTime(o.UploadedAt),
-			Status:     pgxTextToString(o.Status),
-			Accrual:    pgxFloat4ToFloat64(o.Accrual),
-			UserLogin:  o.UserLogin,
+		order, err := dbToModelOrder(&o)
+		if err != nil {
+			return nil, err
 		}
+
+		orders[i] = *order
 	}
-	return &orders
+	return &orders, nil
 }
 
-func dbToModelOrder(o *gen.Order) *models.Order {
+func dbToModelOrder(o *gen.Order) (*models.Order, error) {
+	updatedAt, err := pgTimeToTime(o.UploadedAt)
+	if err != nil {
+		return nil, fmt.Errorf("convert db to model order error: %w", err)
+	}
+
+	status, err := pgxTextToString(o.Status)
+	if err != nil {
+		return nil, fmt.Errorf("convert db to model order error: %w", err)
+	}
+
+	accrual, err := pgxFloat4ToFloat64(o.Accrual)
+	if err != nil {
+		return nil, fmt.Errorf("convert db to model order error: %w", err)
+	}
+
 	return &models.Order{
 		Number:     o.Number,
-		UploadedAt: pgTimeToTime(o.UploadedAt),
+		UploadedAt: updatedAt,
+		Status:     status,
+		Accrual:    accrual,
 		UserLogin:  o.UserLogin,
-		Status:     pgxTextToString(o.Status),
-		Accrual:    pgxFloat4ToFloat64(o.Accrual),
-	}
+	}, nil
 }
 
-func dbToModelWithdrawals(dbOrders *[]gen.Withdrawal) *[]models.Withdrawal {
+func dbToModelWithdrawals(dbOrders *[]gen.Withdrawal) (*[]models.Withdrawal, error) {
 	withdrawals := make([]models.Withdrawal, len(*dbOrders))
 	for i, o := range *dbOrders {
+		processedAt, err := pgTimeToTime(o.ProcessedAt)
+		if err != nil {
+			return nil, fmt.Errorf("convert db to model withdrawal error: %w", err)
+		}
+
+		sum, err := pgxFloat4ToFloat64(o.Sum)
+		if err != nil {
+			return nil, fmt.Errorf("convert db to model withdrawal error: %w", err)
+		}
+
 		withdrawals[i] = models.Withdrawal{
 			Number:      o.Number,
-			ProcessedAt: pgTimeToTime(o.ProcessedAt),
-			Sum:         pgxFloat4ToFloat64(o.Sum),
+			ProcessedAt: processedAt,
+			Sum:         sum,
 		}
 	}
-	return &withdrawals
+	return &withdrawals, nil
 }

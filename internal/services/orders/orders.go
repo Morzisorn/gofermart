@@ -7,19 +7,17 @@ import (
 	"fmt"
 
 	"github.com/morzisorn/gofermart/internal/errs"
-	"github.com/morzisorn/gofermart/internal/logger"
 	"github.com/morzisorn/gofermart/internal/models"
 	"github.com/morzisorn/gofermart/internal/repositories"
 	"github.com/morzisorn/gofermart/internal/services/users"
-	"go.uber.org/zap"
 )
 
 type OrderService struct {
 	repo repositories.Repository
-	user *users.UserService
+	user users.BalanceGetter
 }
 
-func NewOrderService(repo repositories.Repository, user *users.UserService) *OrderService {
+func NewOrderService(repo repositories.Repository, user users.BalanceGetter) *OrderService {
 	return &OrderService{
 		repo: repo,
 		user: user,
@@ -28,7 +26,7 @@ func NewOrderService(repo repositories.Repository, user *users.UserService) *Ord
 
 func (os *OrderService) UploadOrder(ctx context.Context, login, number string) error {
 	if !isNumberValid(number) {
-		return errs.ErrIncorrectNumber
+		return fmt.Errorf("failed to upload order: %w", errs.ErrIncorrectNumber)
 	}
 
 	_, err := os.repo.UploadOrder(ctx, login, number)
@@ -43,9 +41,9 @@ func (os *OrderService) GetUserOrders(ctx context.Context, login string) (*[]mod
 	orders, err := os.repo.GetUserOrders(ctx, login)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		return nil, errs.ErrNoData
+		return nil, fmt.Errorf("get user orders error: %w", errs.ErrNoData)
 	case err != nil:
-		return nil, err
+		return nil, fmt.Errorf("get user orders error: %w", err)
 	}
 	return orders, nil
 }
@@ -58,9 +56,9 @@ func (os *OrderService) GetUserWithdrawals(ctx context.Context, login string) (*
 	withdrawals, err := os.repo.GetUserWithdrawals(ctx, login)
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
-		return nil, errs.ErrNoData
+		return nil, fmt.Errorf("get user withdrawals error: %w", errs.ErrNoData)
 	case err != nil:
-		return nil, err
+		return nil, fmt.Errorf("get user withdrawals error: %w", err)
 	}
 	return withdrawals, nil
 }
@@ -68,15 +66,15 @@ func (os *OrderService) GetUserWithdrawals(ctx context.Context, login string) (*
 func (os *OrderService) Withdraw(ctx context.Context, login string, w *models.Withdrawal) error {
 	balance, err := os.user.GetBalance(ctx, &models.User{Login: login})
 	if err != nil {
-		return err
+		return fmt.Errorf("withdrawal error: %w", err)
 	}
 
 	if balance.Current < w.Sum {
-		return errs.ErrInsufficientBalance
+		return fmt.Errorf("withdrawal error: %w", errs.ErrInsufficientBalance)
 	}
 
 	if !isNumberValid(w.Number) {
-		return errs.ErrIncorrectNumber
+		return fmt.Errorf("withdrawal error: %w", errs.ErrIncorrectNumber)
 	}
 
 	return os.repo.Withdraw(ctx, login, w.Number, w.Sum)
@@ -85,16 +83,17 @@ func (os *OrderService) Withdraw(ctx context.Context, login string, w *models.Wi
 func (os *OrderService) UpdateOrderStatus(ctx context.Context, number, newStatus string) error {
 	err := os.repo.UpdateOrderStatus(ctx, number, models.OrderStatusPROCESSING)
 	if err != nil {
-		logger.Log.Error("Failed to change order status. ",
-			zap.String("Order number: %s", number),
-			zap.String("New status: %s", models.OrderStatusPROCESSING),
-		)
+		return fmt.Errorf("update order status error: %w", err)
 	}
-	return err
+	return nil
 }
 
 func (os *OrderService) OrderProcessed(ctx context.Context, order models.Order) error {
-	return os.repo.OrderProcessed(ctx, order.UserLogin, order.Number, order.Accrual)
+	err := os.repo.OrderProcessed(ctx, order.UserLogin, order.Number, order.Accrual)
+	if err != nil {
+		return fmt.Errorf("finish order processing error: %w", err)
+	}
+	return nil
 }
 
 // Luhn algorithm

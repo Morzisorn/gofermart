@@ -1,6 +1,7 @@
 package users
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -17,7 +18,7 @@ func generateToken(login string) (string, error) {
 	cnfg := config.GetConfig()
 	signedToken, err := token.SignedString([]byte(cnfg.SecretKey))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("generate token error: %w", err)
 	}
 
 	return signedToken, nil

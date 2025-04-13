@@ -30,9 +30,14 @@ func GetConfig() *Config {
 		var err error
 		instance, err = New()
 		if err != nil {
-			logger.Log.Error("Error getting service", zap.Error(err))
+			logger.Log.Fatal("Error getting service", zap.Error(err))
 		}
 	})
+
+	if instance == nil {
+		logger.Log.Fatal("Configuration instance is nil")
+	}
+
 	return instance
 }
 

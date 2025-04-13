@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/morzisorn/gofermart/internal/models"
 	"resty.dev/v3"
@@ -14,12 +15,18 @@ type HTTPClient struct {
 }
 
 func (c *HTTPClient) CalculateBonuses(ctx context.Context, number string) (*models.LoyaltyOrder, error) {
-	url := fmt.Sprintf("http://%s/api/orders/%s", c.BaseURL, number)
+	base := &url.URL{
+		Scheme: "http",
+		Host: c.BaseURL,
+		Path: "api/orders/",
+	}
+
+	url := base.ResolveReference(&url.URL{Path: number})
 
 	var order models.LoyaltyOrder
 	resp, err := c.Client.R().
 		SetResult(&order).
-		Get(url)
+		Get(url.String())
 
 	if err != nil {
 		return nil, err

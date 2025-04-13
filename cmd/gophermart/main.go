@@ -23,18 +23,16 @@ import (
 	"go.uber.org/zap"
 )
 
-var cnfg *config.Config
-
-var accrualCmd *exec.Cmd
-
 func main() {
 	if err := logger.Init(); err != nil {
 		panic(err)
 	}
-	cnfg = config.GetConfig()
+	cnfg := config.GetConfig()
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+
+	var accrualCmd *exec.Cmd
 
 	go func() {
 		<-c
@@ -66,13 +64,18 @@ func main() {
 
 	mux := createServer(userController, orderController)
 
-	if err := runAccrualServer(); err != nil {
-		logger.Log.Error("Error running accrual server", zap.Error(err))
+	accrualCmd, err := createAccrualServer(cnfg)
+	if err != nil {
+		logger.Log.Fatal("Failed to create accrual server")
 	}
 
-	go runProcessing(processingService, cnfg)
+	if err := accrualCmd.Start(); err != nil {
+		logger.Log.Fatal("Failed to start accrual server. ", zap.Error(err))
+	}
 
-	if err := runServer(mux); err != nil {
+	go runProcessing(context.Background(), processingService, cnfg)
+
+	if err := runServer(mux, cnfg); err != nil {
 		logger.Log.Error("Error running server", zap.Error(err))
 		err := accrualCmd.Process.Kill()
 		if err != nil {
@@ -83,47 +86,23 @@ func main() {
 	}
 }
 
-func runAccrualServer() error {
+func createAccrualServer(cnfg *config.Config) (*exec.Cmd, error) {
 	root, err := config.GetProjectRoot()
 	if err != nil {
-		return fmt.Errorf("get project root error: %w", err)
+		return nil, fmt.Errorf("get project root error: %w", err)
 	}
 
 	filename := fmt.Sprintf("accrual_%s_%s", runtime.GOOS, runtime.GOARCH)
 	path := filepath.Join(root, "cmd", "accrual", filename)
+	logger.Log.Info("Accrual binary path", zap.String("path", path))
 
-	accrualCmd = exec.Command(path, "-a", cnfg.AccrualSystemAddress)
+	accrualCmd := exec.Command(path, "-a", cnfg.AccrualSystemAddress)
 	accrualCmd.Env = []string{}
 
 	accrualCmd.Stdout = os.Stdout
 	accrualCmd.Stderr = os.Stderr
 
-	logger.Log.Info("Accrual binary path", zap.String("path", path))
-
-	logger.Log.Info("Running accrual server")
-	if err := accrualCmd.Start(); err != nil {
-		return fmt.Errorf("failed to start accrual server: %w", err)
-	}
-
-	// go func() {
-	// 	err := accrualCmd.Wait()
-	// 	if err != nil {
-	// 		logger.Log.Error("accrual process exited with error", zap.Error(err))
-	// 		accrualCmd.Process.Kill()
-	// 	}
-	// }()
-
-	// const maxAttempts = 3
-	// for i := 0; i < maxAttempts; i++ {
-	// 	resp, err := http.Get(fmt.Sprintf("http://%s/api/orders/12345678903", cnfg.AccrualSystemAddress))
-	// 	if err == nil && resp.StatusCode < 300 {
-	// 		logger.Log.Info("Accrual server is up and running")
-	// 		return nil
-	// 	}
-	// 	time.Sleep(500 * time.Millisecond)
-	// }
-
-	return fmt.Errorf("accrual server did not start in time")
+	return accrualCmd, nil
 }
 
 func createServer(
@@ -140,7 +119,7 @@ func createServer(
 	{
 		authGroup.GET("/balance", uc.GetBalance)
 
-		authGroup.POST("/orders", oc.UploadOrder)
+		authGroup.POST("/orders", controllers.RequireContentType("text/plain"), oc.UploadOrder)
 		authGroup.POST("/balance/withdraw", oc.Withdraw)
 		authGroup.GET("/orders", oc.GetUserOrders)
 		authGroup.GET("/withdrawals", oc.GetUserWithdrawals)
@@ -149,20 +128,26 @@ func createServer(
 	return mux
 }
 
-func runServer(mux *gin.Engine) error {
+func runServer(mux *gin.Engine, cnfg *config.Config) error {
 	logger.Log.Info("Starting server on ", zap.String("address", cnfg.RunAddress))
 
 	return mux.Run(cnfg.RunAddress)
 }
 
-func runProcessing(ps *processing.ProcessingService, cnfg *config.Config) {
+func runProcessing(ctx context.Context, ps *processing.ProcessingService, cnfg *config.Config) {
 	ticker := time.NewTicker(time.Duration(cnfg.LoyaltyUpdateInterval) * time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		err := ps.ProcessOrders(context.Background())
-		if err != nil {
-			logger.Log.Error("Processing error: ", zap.Error(err))
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Log.Info("Context canceled, stopping processing loop")
+			return
+		case <-ticker.C:
+			err := ps.ProcessOrders(context.Background())
+			if err != nil {
+				logger.Log.Error("Processing error: ", zap.Error(err))
+			}
 		}
 	}
 }

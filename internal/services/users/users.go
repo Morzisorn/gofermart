@@ -3,25 +3,18 @@ package users
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/morzisorn/gofermart/internal/errs"
 	"github.com/morzisorn/gofermart/internal/hash"
-	"github.com/morzisorn/gofermart/internal/logger"
 	"github.com/morzisorn/gofermart/internal/models"
 	"github.com/morzisorn/gofermart/internal/repositories"
-	"go.uber.org/zap"
 )
 
 type UserService struct {
 	repo repositories.Repository
 }
-
-var (
-	ErrUserNotFound          = errors.New("user not found")
-	ErrUserAlreadyRegistered = errors.New("user is already registered")
-	ErrIncorrectCredentials  = errors.New("incorrect login or password")
-	ErrInternalServerError   = errors.New("internal server error")
-)
 
 func NewUserService(repo repositories.Repository) *UserService {
 	return &UserService{repo: repo}
@@ -32,20 +25,20 @@ func (us *UserService) GetUser(ctx context.Context, user *models.User) (*models.
 	user, err = us.repo.GetUser(ctx, user.Login)
 	switch err {
 	case pgx.ErrNoRows:
-		return nil, ErrUserNotFound
+		return nil, fmt.Errorf("get user error: %w", errs.ErrUserNotFound)
 	case nil:
 		return user, nil
 	}
-	return nil, err
+	return nil, fmt.Errorf("get user error: %w", err)
 }
 
 func (us *UserService) RegisterUser(ctx context.Context, user *models.ParseUserRegister) (string, error) {
 	_, err := us.GetUser(ctx, &models.User{Login: user.Login})
 	switch {
 	case err == nil:
-		return "", ErrUserAlreadyRegistered
-	case !errors.Is(err, ErrUserNotFound):
-		return "", err
+		return "", fmt.Errorf("register user error: %w", errs.ErrUserAlreadyRegistered)
+	case !errors.Is(err, errs.ErrUserNotFound):
+		return "", fmt.Errorf("register user error: %w", err)
 	}
 
 	hash := hash.GetHash([]byte(user.Password))
@@ -54,30 +47,30 @@ func (us *UserService) RegisterUser(ctx context.Context, user *models.ParseUserR
 		Password: hash,
 	})
 	if err != nil {
-		logger.Log.Error("Sign up user error: ", zap.Error(err))
+		return "", fmt.Errorf("register user error: %w", err)
 	}
 
 	token, err := generateToken(user.Login)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("register user error: %w", err)
 	}
 
 	return token, nil
 }
 
-func (us *UserService) LoginUser(ctx context.Context, user * models.ParseUserRegister) (string, error) {
+func (us *UserService) LoginUser(ctx context.Context, user *models.ParseUserRegister) (string, error) {
 	dbUser, err := us.GetUser(ctx, &models.User{
 		Login: user.Login,
 	})
 	switch {
-	case errors.Is(err, ErrUserNotFound):
-		return "", ErrIncorrectCredentials
+	case errors.Is(err, errs.ErrUserNotFound):
+		return "", fmt.Errorf("login error: %w", errs.ErrIncorrectCredentials)
 	case err != nil:
-		return "", ErrInternalServerError
+		return "", fmt.Errorf("login error: %w", errs.ErrInternalServerError)
 	}
 
 	if hash := hash.GetHash([]byte(user.Password)); hash != dbUser.Password {
-		return "", ErrIncorrectCredentials
+		return "", fmt.Errorf("login error: %w", errs.ErrIncorrectCredentials)
 	}
 
 	return generateToken(user.Login)
