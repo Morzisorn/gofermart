@@ -34,22 +34,6 @@ func main() {
 
 	var accrualCmd *exec.Cmd
 
-	go func() {
-		<-c
-		logger.Log.Info("Shutting down...")
-
-		if accrualCmd != nil && accrualCmd.Process != nil {
-			err := accrualCmd.Process.Kill()
-			if err != nil {
-				logger.Log.Error("Failed to kill accrual process", zap.Error(err))
-			} else {
-				logger.Log.Info("Accrual process killed")
-			}
-		}
-
-		os.Exit(0)
-	}()
-
 	repo := repositories.NewRepository(cnfg)
 
 	userService := users.NewUserService(repo)
@@ -65,6 +49,8 @@ func main() {
 	mux := createServer(userController, orderController)
 
 	accrualCmd, err := createAccrualServer(cnfg)
+	defer killProcess(accrualCmd)
+
 	if err != nil {
 		logger.Log.Fatal("Failed to create accrual server")
 	}
@@ -148,6 +134,18 @@ func runProcessing(ctx context.Context, ps *processing.ProcessingService, cnfg *
 			if err != nil {
 				logger.Log.Error("Processing error: ", zap.Error(err))
 			}
+		}
+	}
+}
+
+
+func killProcess(p *exec.Cmd) {
+	if p != nil && p.Process != nil {
+		err := p.Process.Kill()
+		if err != nil {
+			logger.Log.Error("Failed to kill accrual process", zap.Error(err))
+		} else {
+			logger.Log.Info("Accrual process killed")
 		}
 	}
 }
