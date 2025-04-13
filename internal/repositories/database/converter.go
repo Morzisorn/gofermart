@@ -58,10 +58,7 @@ func dbToModelOrder(o *gen.Order) (*models.Order, error) {
 		return nil, fmt.Errorf("convert db to model order error: %w", err)
 	}
 
-	accrual, err := pgxFloat4ToFloat64(o.Accrual)
-	if err != nil {
-		return nil, fmt.Errorf("convert db to model order error: %w", err)
-	}
+	accrual, _ := pgxFloat4ToFloat64(o.Accrual)
 
 	return &models.Order{
 		Number:     o.Number,
