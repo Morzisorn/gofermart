@@ -27,9 +27,6 @@ func main() {
 	}
 	cnfg := config.GetConfig()
 
-	//c := make(chan os.Signal, 1)
-	//signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-
 	var accrualCmd *exec.Cmd
 
 	repo := repositories.NewRepository(cnfg)
